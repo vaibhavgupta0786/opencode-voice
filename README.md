@@ -1,46 +1,71 @@
 # opencode-voice
 
-Local-only push-to-talk dictation for OpenCode v2.
+Local-only push-to-talk dictation for [OpenCode](https://opencode.ai) v2.
+Press `f9`, talk (pauses welcome), press `f9` again — the transcript lands
+in an edit dialog, then goes to your session.
 
-`f9` starts recording, `f9` stops. The take is transcribed by a local
-whisper server, shown in an edit dialog, then sent to the current session.
+No cloud, no temp audio files, no auto-send, no permission answering.
+
+## Install
+
+Requirements: OpenCode v2, a local STT server (see `docs/STT.md`),
+macOS Microphone permission for your terminal.
+
+```sh
+mkdir -p ~/.config/opencode/plugins
+git clone https://github.com/vaibhavgupta0786/opencode-voice ~/.config/opencode/plugins/voice
+# restart the OpenCode TUI, open a session, press f9
+```
+
+`f9` may be hijacked by macOS Fn keys — `Ctrl+P` → `dictate` (or
+`/dictate`) works the same.
+
+## Usage
+
+| Input | Action |
+|---|---|
+| `f9` | start recording ("Recording… f9 to stop.") |
+| `f9` again | stop → transcribe → edit dialog → send |
+| `/dictate` | same, via slash command / palette |
+
+After transcribing, an edit dialog opens prefilled with the text.
+Confirm to send to the current session, cancel to drop it.
+Takes cap at 60 s. Debug log: `/tmp/opencode/voice-plugin.log`.
 
 ## How it works
 
 ```
-f9 -> bundled mic recorder (16 kHz PCM, in memory, no files)
-   -> POST to local STT at http://127.0.0.1:8080/v1/audio/transcriptions
-   -> edit dialog prefilled with the transcript
-   -> send to current session
+f9 -> bundled mic recorder (16 kHz PCM, stdout, in memory)
+   -> silence/VAD state machine (toggle: pauses never end the take)
+   -> POST WAV to local whisper at 127.0.0.1:8080
+   -> edit dialog -> session.prompt
 ```
 
-- No cloud, no temp audio files, no auto-send, no permission answering.
-- Toggle mode: pauses never end the take (thinking time is safe).
-- 60 s hard cap per take.
+See `docs/STT.md` (server + model choice) and `docs/TROUBLESHOOTING.md`.
 
-## Requirements
-
-- OpenCode v2 (TUI plugin API `@opencode/plugin/tui`)
-- A local OpenAI-compatible STT server on `127.0.0.1:8080`
-  (e.g. faster-whisper: `WHISPER_MODEL=small python server.py`)
-- macOS microphone permission for your terminal
-
-## Install (local)
+## Development
 
 ```sh
-mkdir -p ~/.config/opencode/plugins
-cp -r voice ~/.config/opencode/plugins/voice
-# restart the OpenCode TUI, press f9
+npm ci
+npm test        # 12 unit tests, no mic needed
+npm run typecheck
 ```
+
+Pure logic in `logic.ts`, host/IO in `tui.ts`. See `CONTRIBUTING.md`.
 
 ## Recorder binaries
 
-`bin/` ships prebuilt mic recorders. They are built from
+`bin/` ships prebuilt mic recorders built from
 [opencode-dictate](https://github.com/rodri45l/opencode-dictate)'s
-`recorder/recorder.c` (miniaudio, MIT-licensed) — see NOTICE.
-Rebuild: `cc -O2 -o bin/darwin-arm64/opencode-voice-recorder recorder.c
--framework CoreAudio -framework AudioToolbox -framework CoreFoundation`
-(source not vendored here; fetch it from the link above).
+`recorder/recorder.c` (miniaudio, MIT) — see NOTICE. SHA256 pinned in
+`bin/SHA256SUMS` and verified in CI. To rebuild from source, fetch
+`recorder.c` + `miniaudio.h` upstream and compile, e.g. on macOS:
+`cc -O2 -o recorder recorder.c -framework CoreAudio -framework AudioToolbox -framework CoreFoundation`.
+
+## Roadmap
+
+- 🎤 mic button in the prompt footer
+- Voice-out: spoken digest of long replies (not verbatim readout) + local TTS
 
 ## License
 

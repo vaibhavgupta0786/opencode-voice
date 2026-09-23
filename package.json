@@ -1,0 +1,17 @@
+{
+  "name": "opencode-voice",
+  "version": "0.1.0",
+  "description": "Local-only push-to-talk dictation for OpenCode v2.",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test 'test/*.test.ts'",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@opencode/client": "2.0.12",
+    "@opencode/plugin": "2.0.12",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.4.0"
+  }
+}
