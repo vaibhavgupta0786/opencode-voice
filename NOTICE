@@ -1,0 +1,12 @@
+NOTICE — third-party binaries in bin/
+
+The recorders in bin/darwin-arm64, bin/darwin-x64 and bin/linux-x64 were
+built from recorder/recorder.c of opencode-dictate
+(https://github.com/rodri45l/opencode-dictate), which is MIT-licensed:
+
+  MIT License, Copyright (c) 2026 Rodrigo
+
+The recorder is a thin wrapper around miniaudio (MIT-0 / public-domain
+style licence, https://github.com/mackron/miniaudio) talking directly to
+CoreAudio (macOS) / ALSA / PulseAudio (Linux). It streams raw 16 kHz mono
+PCM to stdout and stops itself at a deadline; it performs no network I/O.
