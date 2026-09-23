@@ -29,7 +29,8 @@ git clone https://github.com/vaibhavgupta0786/opencode-voice ~/.config/opencode/
 | `/dictate` | same, via slash command / palette |
 
 After transcribing, a large edit dialog opens with the full text.
-`Cmd+Enter` sends to the current session, `Esc` discards.
+`Ctrl+Enter` sends to the current session (`Cmd+Enter` also works where the
+terminal delivers it), `Esc` discards.
 A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡 transcribing.
 Takes cap at 60 s. Debug log: `/tmp/opencode/voice-plugin.log`.
 
