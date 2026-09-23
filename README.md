@@ -28,8 +28,9 @@ git clone https://github.com/vaibhavgupta0786/opencode-voice ~/.config/opencode/
 | `f9` again | stop → transcribe → edit dialog → send |
 | `/dictate` | same, via slash command / palette |
 
-After transcribing, an edit dialog opens prefilled with the text.
-Confirm to send to the current session, cancel to drop it.
+After transcribing, a large edit dialog opens with the full text.
+`Cmd+Enter` sends to the current session, `Esc` discards.
+A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡 transcribing.
 Takes cap at 60 s. Debug log: `/tmp/opencode/voice-plugin.log`.
 
 ## How it works

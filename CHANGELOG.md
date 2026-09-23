@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Mic status indicator in the prompt footer (idle / recording / transcribing).
+- Large editable dialog for transcripts (Cmd+Enter sends, Esc discards).
+
 ## v0.1.0
 
 - Toggle dictation: `f9` starts, `f9` stops; pauses never end the take.

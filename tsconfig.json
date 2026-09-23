@@ -7,7 +7,9 @@
     "strict": true,
     "skipLibCheck": true,
     "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/solid",
     "types": ["node"]
   },
-  "include": ["tui.ts", "logic.ts", "test/**/*.test.ts"]
+  "include": ["tui.tsx", "logic.ts", "test/**/*.test.ts"]
 }

@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin/tui"
+import { createSignal } from "solid-js"
 import { spawn, type ChildProcess } from "node:child_process"
 import { appendFileSync, existsSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
@@ -18,11 +19,13 @@ import {
 } from "./logic.ts"
 
 // ---------------------------------------------------------------------------
-// opencode-voice: minimal local-only push-to-talk for OpenCode v2.
-// f9 -> record mic -> transcribe via local whisper server -> edit in dialog
-//     -> send to current session. No cloud, no temp audio files, no
-//     auto-send, no permission answering.
+// opencode-voice: local-only push-to-talk for OpenCode v2.
+// f9 (or the mic in the prompt footer) -> record -> local whisper STT ->
+// large editable dialog (Cmd+Enter sends, Esc discards) -> current session.
+// No cloud, no temp audio files, no auto-send, no permission answering.
 // ---------------------------------------------------------------------------
+
+type Phase = "idle" | "recording" | "transcribing"
 
 const DEBUG_LOG = "/tmp/opencode/voice-plugin.log"
 
@@ -156,11 +159,116 @@ export default Plugin.define({
     // Toggle state: f9 while recording stops the take instead of starting one.
     let stopActive: (() => void) | null = null
 
-    // Keymap layers need a component owner: register inside the `app` slot.
-    // Returning the slot cleanup from setup unregisters everything on unload.
+    // One footer slot owns everything: the live mic indicator plus the
+    // global keymap (layers need a component owner, the slot provides it).
     return ctx.ui.slot({
-      append: "app",
+      append: "prompt.footer.status",
       render: () => {
+        const [phase, setPhase] = createSignal<Phase>("idle")
+
+        const dictate = async () => {
+          const route = ctx.ui.router.current()
+          if (route.type !== "session") {
+            ctx.ui.toast.show({ message: "Open a session first, then dictate.", variant: "warning" })
+            return
+          }
+          // Second f9 while recording: stop the take, transcription follows.
+          if (stopActive) {
+            ctx.ui.toast.show({ message: "Stopped — transcribing…", variant: "info", duration: 2000 })
+            log("manual stop")
+            const stop = stopActive
+            stopActive = null
+            stop()
+            return
+          }
+          const sessionID = route.sessionID
+          setPhase("recording")
+          ctx.ui.toast.show({
+            message: opts.toggle ? "Recording… f9 to stop." : "Listening… speak now.",
+            variant: "info",
+            duration: 2000,
+          })
+          log("dictate started")
+          const cap = capture(opts, log)
+          stopActive = cap.stop
+          let audio: Capture
+          try {
+            audio = await cap.done
+          } catch (error) {
+            stopActive = null
+            setPhase("idle")
+            const message = error instanceof Error ? error.message : String(error)
+            log(`capture failed: ${message}`)
+            ctx.ui.toast.show({ title: "Voice", message: `Mic failed: ${message}`, variant: "error" })
+            return
+          }
+          stopActive = null
+          if (!audio.hadSpeech) {
+            setPhase("idle")
+            ctx.ui.toast.show({ message: "Heard nothing — try again.", variant: "warning" })
+            return
+          }
+          setPhase("transcribing")
+          const sttStarted = Date.now()
+          let text: string
+          try {
+            text = await transcribe(audio.wav, opts)
+          } catch (error) {
+            setPhase("idle")
+            const message = error instanceof Error ? error.message : String(error)
+            log(`transcribe failed: ${message}`)
+            ctx.ui.toast.show({
+              title: "Voice",
+              message: `STT failed (${message}). Is the local server up?`,
+              variant: "error",
+            })
+            return
+          }
+          if (!text) {
+            setPhase("idle")
+            ctx.ui.toast.show({ message: "Empty transcription — try again.", variant: "warning" })
+            return
+          }
+          log(`transcript="${text}"`)
+          log(`timing audio=${Math.round(audio.voicedMs)}ms stt=${Date.now() - sttStarted}ms bytes=${audio.wav.length}`)
+          setPhase("idle")
+          openEditor(sessionID, text)
+        }
+
+        // Large editable dialog. Cmd+Enter sends, Esc discards.
+        const openEditor = (sessionID: string, initial: string) => {
+          let edited = initial
+          let sent = false
+          let area: { plainText: string } | undefined
+          const finish = (value: string) => {
+            if (sent || !value.trim()) return
+            sent = true
+            ctx.ui.dialog.clear()
+            void ctx.client.session.prompt({ sessionID, text: value.trim() })
+          }
+          ctx.ui.dialog.set({ size: "large", centered: true })
+          ctx.ui.dialog.show(() => (
+            <box flexDirection="column" gap={1} padding={1}>
+              <text>🎤 Dictation — edit, Cmd+Enter to send, Esc to discard</text>
+              <textarea
+                initialValue={initial}
+                focused
+                ref={(el: unknown) => {
+                  area = el as { plainText: string }
+                }}
+                onContentChange={(value: unknown) => {
+                  if (typeof value === "string") edited = value
+                }}
+                onSubmit={() => finish(area?.plainText ?? edited)}
+                onKeyDown={(event: unknown) => {
+                  const name = (event as { name?: string } | null)?.name
+                  if (name === "escape") ctx.ui.dialog.clear()
+                }}
+              />
+            </box>
+          ))
+        }
+
         ctx.keymap.layer(() => ({
           mode: "global",
           commands: [
@@ -172,74 +280,19 @@ export default Plugin.define({
               bind: "f9",
               palette: true,
               slash: { name: "dictate" },
-              run: async () => {
-                const route = ctx.ui.router.current()
-                if (route.type !== "session") {
-                  ctx.ui.toast.show({ message: "Open a session first, then dictate.", variant: "warning" })
-                  return
-                }
-                // Second f9 while recording: stop the take, transcription follows.
-                if (stopActive) {
-                  ctx.ui.toast.show({ message: "Stopped — transcribing…", variant: "info", duration: 2000 })
-                  log("manual stop")
-                  const stop = stopActive
-                  stopActive = null
-                  stop()
-                  return
-                }
-                const sessionID = route.sessionID
-                ctx.ui.toast.show({
-                  message: opts.toggle ? "Recording… f9 to stop." : "Listening… speak now.",
-                  variant: "info",
-                  duration: 2000,
-                })
-                log("dictate started")
-                const cap = capture(opts, log)
-                stopActive = cap.stop
-                let audio: Capture
-                try {
-                  audio = await cap.done
-                } catch (error) {
-                  stopActive = null
-                  const message = error instanceof Error ? error.message : String(error)
-                  log(`capture failed: ${message}`)
-                  ctx.ui.toast.show({ title: "Voice", message: `Mic failed: ${message}`, variant: "error" })
-                  return
-                }
-                stopActive = null
-                if (!audio.hadSpeech) {
-                  ctx.ui.toast.show({ message: "Heard nothing — try again.", variant: "warning" })
-                  return
-                }
-                ctx.ui.toast.show({ message: "Transcribing…", variant: "info", duration: 2000 })
-                let text: string
-                try {
-                  text = await transcribe(audio.wav, opts)
-                } catch (error) {
-                  const message = error instanceof Error ? error.message : String(error)
-                  log(`transcribe failed: ${message}`)
-                  ctx.ui.toast.show({
-                    title: "Voice",
-                    message: `STT failed (${message}). Is the local server up?`,
-                    variant: "error",
-                  })
-                  return
-                }
-                if (!text) {
-                  ctx.ui.toast.show({ message: "Empty transcription — try again.", variant: "warning" })
-                  return
-                }
-                log(`transcript="${text}"`)
-                const edited = await ctx.ui.dialog.prompt({ title: "Dictation", value: text })
-                if (edited === undefined || !edited.trim()) return // cancelled
-                await ctx.client.session.prompt({ sessionID, text: edited.trim() })
-              },
+              run: () => dictate(),
             },
           ],
           bindings: ["voice.dictate"],
         }))
-        // No visible UI: the slot exists only to own the keymap layer.
-        return null
+
+        const label = () => {
+          const p = phase()
+          if (p === "recording") return "🔴 REC f9"
+          if (p === "transcribing") return "🟡 …"
+          return "🎤 f9"
+        }
+        return <text>{label()}</text>
       },
     })
   },
