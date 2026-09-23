@@ -249,10 +249,11 @@ export default Plugin.define({
           ctx.ui.dialog.set({ size: "large", centered: true })
           ctx.ui.dialog.show(() => (
             <box flexDirection="column" gap={1} padding={1}>
-              <text>🎤 Dictation — edit, Cmd+Enter to send, Esc to discard</text>
+              <text>🎤 Dictation — edit, Ctrl+Enter to send, Esc to discard</text>
               <textarea
                 initialValue={initial}
                 focused
+                keyBindings={[{ name: "return", ctrl: true, action: "submit" }]}
                 ref={(el: unknown) => {
                   area = el as { plainText: string }
                 }}
