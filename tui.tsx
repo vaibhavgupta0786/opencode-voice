@@ -356,7 +356,7 @@ export default Plugin.define({
               title: "Clear voice draft",
               description: "Discard the accumulated draft without sending.",
               group: "Voice",
-              bind: "f11",
+              bind: "shift+f9",
               palette: true,
               slash: { name: "voice-clear" },
               run: () => clearDraft(),
