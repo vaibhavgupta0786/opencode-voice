@@ -16,9 +16,14 @@ transcript="..."
 
 ## `voiced=0ms loudest=0.000` — pure silence
 
-macOS Microphone permission. **System Settings → Privacy & Security →
-Microphone** → enable your terminal app, then retry. (CoreAudio feeds
-zeros when permission is denied — the recorder runs fine, the mic is muted.)
+Two causes, same symptom:
+
+1. macOS Microphone permission. **System Settings → Privacy & Security →
+   Microphone** → enable your terminal app, then retry. (CoreAudio feeds
+   zeros when permission is denied — the recorder runs fine, the mic is muted.)
+2. The hardware mic was muted by a **plain `F10` press** (no Fn) — macOS
+   maps it to mic mute, and external monitors display the mute state.
+   Unmute via the keyboard/control-center, then retry.
 
 ## `STT failed ... Is the local server up?`
 
@@ -30,7 +35,21 @@ zeros when permission is denied — the recorder runs fine, the mic is muted.)
 
 Toggle mode (default) never ends on silence — only the second `f9` (or the
 60 s cap) ends a take. If takes still split, you are on `toggle: false`;
-either re-enable toggle or raise `silenceMs` (900 → 2500).
+either re-enable toggle or raise `silenceMs` (900 → 2500). Very long
+monologues hit the 60 s cap — raise `maxMs` if you want longer takes.
+
+## F-keys don't reach the app
+
+Press them **with Fn** on MacBooks. Known macOS hardware/system claims:
+plain `F10` = mic mute, plain `F11` = Show Desktop (which is why wipe is
+on `F12`). Leader chords (`Ctrl+X …`) never register from plugin layers —
+that is an OpenCode plugin API limitation, not a bug here.
+
+## Review / wipe do nothing (`f10`, `f12`)
+
+- Slash commands always work: `/voice-send`, `/voice-clear`.
+- If `/voice-send` shows no toast and no editor, check the debug log —
+  an empty draft only toasts; a non-empty one must open the editor.
 
 ## Phantom / hallucinated transcripts
 

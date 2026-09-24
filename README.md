@@ -2,7 +2,7 @@
 
 Local-only push-to-talk dictation for [OpenCode](https://opencode.ai) v2.
 Press `f9`, talk (pauses welcome), press `f9` again — the transcript lands
-in an edit dialog, then goes to your session.
+in a draft you can edit; takes pile up until you send them as one prompt.
 
 No cloud, no temp audio files, no auto-send, no permission answering.
 
@@ -26,18 +26,28 @@ git clone https://github.com/vaibhavgupta0786/opencode-voice ~/.config/opencode/
 |---|---|
 | `f9` | dictate a take (press to start, press to stop) — appended to the draft |
 | `f9` again | stop → transcribe → draft editor opens with all takes |
-| `Ctrl+X V` (`<leader>v`) | open the draft editor anytime |
-| `Ctrl+X Shift+V` (`<leader>V`) | wipe the draft |
+| `f10` | open the draft editor anytime |
+| `f12` | wipe the draft (confirmation dialog) |
 | `/dictate`, `/voice-send`, `/voice-clear` | same via slash command / palette |
 
-(Fn keys beyond F9 are macOS-reserved — F10 mutes the mic, F11 shows the
-desktop — so review/wipe live on leader bindings, which always reach the app.)
+On MacBooks press F-keys **with Fn**. Plain `F10` is the hardware mic-mute
+key and plain `F11` is Show Desktop (macOS reserves it — which is why wipe
+lives on `F12`).
 
-After each take, the large editor opens with the full draft.
-`Ctrl+Enter` sends everything as one prompt (`Cmd+Enter` also works where the
-terminal delivers it), `Esc` closes keeping the draft.
-A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡 transcribing.
-Takes cap at 60 s. Debug log: `/tmp/opencode/voice-plugin.log`.
+**Editor semantics** (one dialog, always the whole draft):
+
+- Opens after every take, with the cursor at the end and the view scrolled
+  to the bottom — long drafts scroll while you type.
+- `Ctrl+Enter` sends everything as one prompt (`Cmd+Enter` also works where
+  the terminal delivers it). `Esc` closes and **keeps your edits** — they
+  are folded back into the draft automatically, whichever way the dialog
+  was closed.
+- A failed send keeps the draft and lets you retry; switching sessions
+  with the editor open refuses to deliver to the wrong chat.
+
+A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡
+transcribing, `🎤·N` = N takes in the draft. Takes cap at 60 s (raise via
+the `maxMs` option). Debug log: `/tmp/opencode/voice-plugin.log`.
 
 ## How it works
 
@@ -45,7 +55,7 @@ Takes cap at 60 s. Debug log: `/tmp/opencode/voice-plugin.log`.
 f9 -> bundled mic recorder (16 kHz PCM, stdout, in memory)
    -> silence/VAD state machine (toggle: pauses never end the take)
    -> POST WAV to local whisper at 127.0.0.1:8080
-   -> edit dialog -> session.prompt
+   -> draft (takes accumulate) -> editor -> session.prompt
 ```
 
 See `docs/STT.md` (server + model choice) and `docs/TROUBLESHOOTING.md`.

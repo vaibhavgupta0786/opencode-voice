@@ -2,9 +2,24 @@
 
 ## Unreleased
 
+- Editor rework — one dialog, robust draft lifecycle:
+  - Esc (or any host-side close) now **keeps your edits** — they are folded
+    back into the draft on every close path, not just our own Esc handler.
+  - Fixed: review (`/voice-send`, then-F10) silently doing nothing after the
+    host closed a previous editor (stale open-flag swallowed the command).
+  - Long drafts scroll (sticky bottom) and the cursor starts at the end —
+    fixes "typing appears dead" once the draft exceeded the dialog.
+  - A failed send keeps the draft and allows retrying in place; switching
+    sessions with the editor open refuses to deliver to the wrong chat.
+- Hotkeys re-bound on plain F-keys (leader chords never register from
+  plugin layers): `F10` review, `F12` wipe — with a confirmation dialog.
+- `F9` while a transcription is still in flight is blocked with a toast
+  instead of overlapping a second recording.
+
+## v0.1.x
+
 - Draft accumulation: takes pile into a draft; one review, one send.
-  - `F9` takes, `F10` opens the draft editor, `F11` wipes it.
-  - Editor opens after every take showing all takes; Ctrl+Enter sends, Esc keeps.
+  - `F9` takes, editor opens after every take showing all takes.
 - Mic status indicator in the prompt footer (idle / recording / transcribing).
 - Large editable dialog for transcripts (Ctrl+Enter sends, Esc keeps).
 - mlx-whisper GPU server (`servers/mlx_server.py`, ~2–3s per take).

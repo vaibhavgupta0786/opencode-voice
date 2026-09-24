@@ -20,8 +20,11 @@ import {
 
 // ---------------------------------------------------------------------------
 // opencode-voice: local-only push-to-talk for OpenCode v2.
-// f9 (or the mic in the prompt footer) -> record -> local whisper STT ->
-// large editable dialog (Cmd+Enter sends, Esc discards) -> current session.
+//   F9  — dictate a take (press to start, press to stop); takes append to a draft
+//   F10 — open the draft editor (all takes); Ctrl+Enter sends, Esc keeps edits
+//   F12 — wipe the draft (confirmation dialog)
+// On MacBooks press F-keys with Fn: plain F10 is the hardware mic-mute key,
+// plain F11 is Show Desktop (macOS reserves it), so review/wipe use F10/F12.
 // No cloud, no temp audio files, no auto-send, no permission answering.
 // ---------------------------------------------------------------------------
 
@@ -156,9 +159,6 @@ export default Plugin.define({
     // TODO: wire debug to plugin options once discovery supports them.
     const opts = { ...mergeOptions(ctx.options as VoiceOptions | undefined), debug: true }
     const log = (m: string) => dbg(opts.debug, m)
-    // Draft: takes pile up here until explicitly sent. Lets you build a
-    // whole context over several takes, then review + send once.
-    // (Lives in the render closure below, next to its display signal.)
     // Toggle state: f9 while recording stops the take instead of starting one.
     let stopActive: (() => void) | null = null
 
@@ -170,7 +170,30 @@ export default Plugin.define({
         const [phase, setPhase] = createSignal<Phase>("idle")
         let draft = ""
         const [takes, setTakes] = createSignal(0)
-        let editorOpen = false
+
+        // --- draft lifecycle --------------------------------------------------
+        // `active` is the current editor instance, if any. Edits are folded
+        // back into the draft on every close path we control (Esc, reopen,
+        // wipe) and — belt and braces — on the host dialog's own onClose, so
+        // a host-side dismissal (Esc handled by OpenCode itself) cannot lose
+        // edits either. There is no "editor open" gate: opening is always
+        // persist -> clear -> show, so reopening is idempotent.
+        interface ActiveEditor {
+          getContent: () => string
+        }
+        let active: ActiveEditor | null = null
+
+        const persistActive = (): void => {
+          if (!active) return
+          const content = active.getContent()
+          if (content.trim()) {
+            draft = content
+            log(`persisted editor edits chars=${draft.length}`)
+          } else {
+            draft = ""
+            setTakes(0)
+          }
+        }
 
         const dictate = async () => {
           const route = ctx.ui.router.current()
@@ -187,7 +210,18 @@ export default Plugin.define({
             stop()
             return
           }
+          // Never overlap a second recording onto an in-flight transcription.
+          if (phase() === "transcribing") {
+            ctx.ui.toast.show({ message: "Still transcribing — one moment.", variant: "warning", duration: 2000 })
+            return
+          }
           const sessionID = route.sessionID
+          // New take from inside the editor: persist edits, close it, record.
+          if (active) {
+            persistActive()
+            active = null
+            ctx.ui.dialog.clear()
+          }
           setPhase("recording")
           ctx.ui.toast.show({
             message: opts.toggle ? "Recording… f9 to stop." : "Listening… speak now.",
@@ -239,19 +273,13 @@ export default Plugin.define({
           log(`timing audio=${Math.round(audio.voicedMs)}ms stt=${Date.now() - sttStarted}ms bytes=${audio.wav.length}`)
           setPhase("idle")
           if (!opts.accumulate) {
-            openEditor(sessionID, text)
+            openEditor(sessionID, text, false)
             return
           }
           draft = draft ? `${draft}\n\n${text}` : text
           setTakes(takes() + 1)
           log(`draft take=${takes()} chars=${draft.length}`)
-          // Single dialog model: every take lands in the draft editor, which
-          // always shows all takes. Reopen if a stale editor is still up.
-          if (editorOpen) ctx.ui.dialog.clear()
-          openEditor(sessionID, draft, () => {
-            draft = ""
-            setTakes(0)
-          })
+          openEditor(sessionID, draft, true)
         }
 
         const openSendDialog = () => {
@@ -260,72 +288,166 @@ export default Plugin.define({
             ctx.ui.toast.show({ message: "Open a session first.", variant: "warning" })
             return
           }
+          // Fold in edits from an editor the host may have closed itself.
+          persistActive()
           if (!draft.trim()) {
             ctx.ui.toast.show({ message: "Draft is empty — dictate with f9 first.", variant: "warning" })
             return
           }
-          if (editorOpen) return // already reviewing
-          openEditor(route.sessionID, draft, () => {
-            draft = ""
-            setTakes(0)
-          })
+          openEditor(route.sessionID, draft, true)
         }
 
-        const clearDraft = () => {
-          if (editorOpen) {
-            editorOpen = false
-            ctx.ui.dialog.clear()
-          }
-          if (!draft) {
+        const clearDraft = async () => {
+          const hadEditor = active !== null
+          persistActive()
+          if (!draft.trim()) {
+            if (hadEditor) {
+              active = null
+              ctx.ui.dialog.clear()
+            }
             ctx.ui.toast.show({ message: "Draft is already empty.", variant: "info" })
             return
           }
-          draft = ""
-          setTakes(0)
-          ctx.ui.toast.show({ message: "Voice draft cleared.", variant: "info" })
+          const confirmed = await ctx.ui.dialog.confirm({
+            title: "Wipe voice draft?",
+            message: `Discard the draft (${draft.length} chars)? This cannot be undone.`,
+            label: { confirm: "Wipe draft", cancel: "Keep it" },
+          })
+          if (confirmed === true) {
+            active = null
+            draft = ""
+            setTakes(0)
+            ctx.ui.dialog.clear()
+            ctx.ui.toast.show({ message: "Voice draft wiped.", variant: "info" })
+            return
+          }
+          // Kept: if the confirm replaced an open editor, reopen it exactly
+          // as it was (edits were persisted before the confirm appeared).
+          if (hadEditor) {
+            const route = ctx.ui.router.current()
+            if (route.type === "session") openEditor(route.sessionID, draft, true)
+          }
         }
 
-        // Large editable dialog. Ctrl+Enter sends, Esc closes keeping the draft.
-        // One flag tracks it so a new take reopens (never stacks) the editor.
-        const openEditor = (sessionID: string, initial: string, afterSend?: () => void) => {
+        // --- editor ------------------------------------------------------------
+        // One dialog, idempotent. Opening always clears any previous dialog,
+        // shows the text with the cursor at the end, and keeps the view stuck
+        // to the bottom so long drafts scroll and stay usable.
+        const openEditor = (sessionID: string, initial: string, persistDraft: boolean) => {
           let edited = initial
           let sent = false
-          let area: { plainText: string } | undefined
-          const finish = (value: string) => {
-            if (sent || !value.trim()) return
+          let cursorPlaced = false
+          let area: { plainText?: string; cursorOffset?: number } | undefined
+
+          // Live-tracked content: prefer the renderable itself, fall back to
+          // the onContentChange mirror (survives renderable destruction).
+          const getContent = (): string => {
+            try {
+              const t = area?.plainText
+              if (typeof t === "string") return t
+            } catch {
+              // destroyed renderable
+            }
+            return edited
+          }
+
+          const self: ActiveEditor = { getContent }
+          const header = persistDraft
+            ? "🎤 Voice draft — edit · Ctrl+Enter send · Esc keep edits"
+            : "🎤 Dictation — edit · Ctrl+Enter send · Esc cancel"
+
+          const finish = async (value: string) => {
+            if (sent || active !== self) return
+            const text = value.trim()
+            if (!text) {
+              cancel()
+              return
+            }
+            // Refuse to deliver to a session other than the one visible now.
+            const route = ctx.ui.router.current()
+            if (route.type !== "session" || route.sessionID !== sessionID) {
+              ctx.ui.toast.show({
+                title: "Voice",
+                message: "Session changed — not sent. Draft kept.",
+                variant: "warning",
+              })
+              return
+            }
             sent = true
-            editorOpen = false
+            if (persistDraft) draft = text // a failed send must not lose the latest text
+            try {
+              await ctx.client.session.prompt({ sessionID, text })
+            } catch (error) {
+              sent = false
+              const message = error instanceof Error ? error.message : String(error)
+              log(`send failed: ${message}`)
+              ctx.ui.toast.show({
+                title: "Voice",
+                message: `Send failed: ${message} — draft kept, Ctrl+Enter to retry.`,
+                variant: "error",
+              })
+              return // editor stays open; retry in place
+            }
+            active = null
             ctx.ui.dialog.clear()
-            void ctx.client.session.prompt({ sessionID, text: value.trim() })
-            afterSend?.()
+            if (persistDraft) {
+              draft = ""
+              setTakes(0)
+            }
           }
+
           const cancel = () => {
-            editorOpen = false
+            if (active !== self) return
+            if (persistDraft) persistActive()
+            active = null
             ctx.ui.dialog.clear()
           }
-          editorOpen = true
+
+          active = self
+          ctx.ui.dialog.clear() // never stack editors
           ctx.ui.dialog.set({ size: "large", centered: true })
-          ctx.ui.dialog.show(() => (
-            <box flexDirection="column" gap={1} padding={1}>
-              <text>🎤 Voice draft — edit, Ctrl+Enter to send, Esc to keep</text>
-              <textarea
-                initialValue={initial}
-                focused
-                keyBindings={[{ name: "return", ctrl: true, action: "submit" }]}
-                ref={(el: unknown) => {
-                  area = el as { plainText: string }
-                }}
-                onContentChange={(value: unknown) => {
-                  if (typeof value === "string") edited = value
-                }}
-                onSubmit={() => finish(area?.plainText ?? edited)}
-                onKeyDown={(event: unknown) => {
-                  const name = (event as { name?: string } | null)?.name
-                  if (name === "escape") cancel()
-                }}
-              />
-            </box>
-          ))
+          ctx.ui.dialog.show(
+            () => (
+              <box flexDirection="column" gap={1} padding={1}>
+                <text>{header}</text>
+                <scrollbox stickyScroll={true} stickyStart="bottom" flexGrow={1}>
+                  <textarea
+                    initialValue={initial}
+                    focused
+                    keyBindings={[{ name: "return", ctrl: true, action: "submit" }]}
+                    ref={(el: unknown) => {
+                      area = el as { plainText?: string; cursorOffset?: number }
+                      // Cursor at the end: new takes land there and edits
+                      // usually continue at the tail of the draft.
+                      if (!cursorPlaced) {
+                        cursorPlaced = true
+                        try {
+                          area.cursorOffset = initial.length
+                        } catch {
+                          // optional nicety, never fatal
+                        }
+                      }
+                    }}
+                    onContentChange={(value: unknown) => {
+                      if (typeof value === "string") edited = value
+                    }}
+                    onSubmit={() => finish(getContent())}
+                    onKeyDown={(event: unknown) => {
+                      const name = (event as { name?: string } | null)?.name
+                      if (name === "escape") cancel()
+                    }}
+                  />
+                </scrollbox>
+              </box>
+            ),
+            () => {
+              // The host closed the dialog itself (Esc handled at the dialog
+              // level): fold the edits into the draft so nothing is lost.
+              if (active !== self) return
+              if (persistDraft) persistActive()
+              active = null
+            },
+          )
         }
 
         ctx.keymap.layer(() => ({
@@ -346,17 +468,17 @@ export default Plugin.define({
               title: "Review voice draft",
               description: "Open the draft editor (all takes). Ctrl+Enter sends, Esc keeps.",
               group: "Voice",
-              bind: "<leader>v",
+              bind: "f10",
               palette: true,
               slash: { name: "voice-send" },
               run: () => openSendDialog(),
             },
             {
               id: "voice.clear",
-              title: "Clear voice draft",
-              description: "Discard the accumulated draft without sending.",
+              title: "Wipe voice draft",
+              description: "Discard the accumulated draft (asks for confirmation).",
               group: "Voice",
-              bind: "<leader>V",
+              bind: "f12",
               palette: true,
               slash: { name: "voice-clear" },
               run: () => clearDraft(),
