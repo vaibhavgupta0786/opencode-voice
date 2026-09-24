@@ -12,8 +12,9 @@
     back into the draft on every close path, not just our own Esc handler.
   - Fixed: review (`/voice-send`, then-F10) silently doing nothing after the
     host closed a previous editor (stale open-flag swallowed the command).
-  - Long drafts scroll (sticky bottom) and the cursor starts at the end —
-    fixes "typing appears dead" once the draft exceeded the dialog.
+  - Long drafts scroll (the textarea is height-capped like the host's own
+    prompt, so the editor scrolls internally and keeps the cursor visible —
+    fixes "typing appears dead" once the draft exceeded the dialog).
   - A failed send keeps the draft and allows retrying in place; switching
     sessions with the editor open refuses to deliver to the wrong chat.
 - Hotkeys re-bound on plain F-keys (leader chords never register from

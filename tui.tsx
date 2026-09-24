@@ -427,38 +427,45 @@ export default Plugin.define({
           active = self
           ctx.ui.dialog.clear() // never stack editors
           ctx.ui.dialog.set({ size: "large", centered: true })
+          // The host's own prompt caps its textarea the same way: bounded
+          // height makes the editor scroll internally and keep the cursor
+          // visible. (A scrollbox wrapper does not work here — the textarea
+          // grows unbounded and the dialog clips it, scrollbar never engages.)
+          const termRows = (process.stdout as { rows?: number }).rows ?? 40
+          const maxHeight = Math.max(6, Math.floor(termRows * 0.5))
           ctx.ui.dialog.show(
             () => (
               <box flexDirection="column" gap={1} padding={1}>
                 <text>{header}</text>
-                <scrollbox stickyScroll={true} stickyStart="bottom" flexGrow={1}>
-                  <textarea
-                    initialValue={initial}
-                    focused
-                    keyBindings={[{ name: "return", ctrl: true, action: "submit" }]}
-                    ref={(el: unknown) => {
-                      area = el as { plainText?: string; cursorOffset?: number }
-                      // Cursor at the end: new takes land there and edits
-                      // usually continue at the tail of the draft.
-                      if (!cursorPlaced) {
-                        cursorPlaced = true
-                        try {
-                          area.cursorOffset = initial.length
-                        } catch {
-                          // optional nicety, never fatal
-                        }
+                <textarea
+                  width="100%"
+                  minHeight={1}
+                  maxHeight={maxHeight}
+                  initialValue={initial}
+                  focused
+                  keyBindings={[{ name: "return", ctrl: true, action: "submit" }]}
+                  ref={(el: unknown) => {
+                    area = el as { plainText?: string; cursorOffset?: number }
+                    // Cursor at the end: new takes land there and edits
+                    // usually continue at the tail of the draft.
+                    if (!cursorPlaced) {
+                      cursorPlaced = true
+                      try {
+                        area.cursorOffset = initial.length
+                      } catch {
+                        // optional nicety, never fatal
                       }
-                    }}
-                    onContentChange={(value: unknown) => {
-                      if (typeof value === "string") edited = value
-                    }}
-                    onSubmit={() => finish(getContent())}
-                    onKeyDown={(event: unknown) => {
-                      const name = (event as { name?: string } | null)?.name
-                      if (name === "escape") cancel()
-                    }}
-                  />
-                </scrollbox>
+                    }
+                  }}
+                  onContentChange={(value: unknown) => {
+                    if (typeof value === "string") edited = value
+                  }}
+                  onSubmit={() => finish(getContent())}
+                  onKeyDown={(event: unknown) => {
+                    const name = (event as { name?: string } | null)?.name
+                    if (name === "escape") cancel()
+                  }}
+                />
               </box>
             ),
             () => {
