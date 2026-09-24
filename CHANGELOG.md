@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Draft is plugin-wide state now: it survives session switches (previously
+  the footer slot remounted on every chat switch and reset it).
+- `F10` opens the editor even with an empty draft — it doubles as a place
+  to compose by hand, then send.
+- Cursor now starts at the end of the draft (deferred set, display-width
+  units — the immediate ref-time set was reset by the initialValue prop sync).
 - Dictating on a brand-new blank session (home/launch route) now starts the
   session and dictates into it, like typing a prompt there would — instead
   of refusing with "open a session first".
