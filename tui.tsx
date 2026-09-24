@@ -20,9 +20,12 @@ import {
 
 // ---------------------------------------------------------------------------
 // opencode-voice: local-only push-to-talk for OpenCode v2.
-//   F9  — dictate a take (press to start, press to stop); takes append to a draft
-//   F10 — open the draft editor (any time, empty or not); Ctrl+Enter sends
-//   F12 — wipe the draft (confirmation dialog)
+//   F9  — dictate a take (press to start, press to stop); takes append to
+//         that session's draft
+//   F10 — open the session's draft editor (any time, empty or not);
+//         Ctrl+Enter sends, Esc keeps edits
+//   F12 — wipe the session's draft (confirmation dialog)
+// Each session keeps its own draft, so switching chats never mixes them.
 // On MacBooks press F-keys with Fn: plain F10 is the hardware mic-mute key,
 // plain F11 is Show Desktop (macOS reserves it), so review/wipe use F10/F12.
 // No cloud, no temp audio files, no auto-send, no permission answering.
@@ -160,6 +163,14 @@ function displayWidth(text: string): number {
   return bun?.stringWidth ? bun.stringWidth(text) : text.length
 }
 
+// One session's draft.
+interface DraftState {
+  text: string
+  takes: number
+}
+
+const EMPTY_DRAFT: DraftState = { text: "", takes: 0 }
+
 export default Plugin.define({
   id: "voice",
   setup(ctx) {
@@ -168,30 +179,34 @@ export default Plugin.define({
     const log = (m: string) => dbg(opts.debug, m)
 
     // --- plugin-scope state -------------------------------------------------
-    // Everything lives at setup scope, NOT inside the footer slot's render:
-    // switching sessions remounts the prompt footer, and render-scoped state
-    // would reset (that is how drafts used to vanish across chats). One draft
-    // persists across chats until sent or wiped.
+    // Per-session drafts, kept at setup scope: switching sessions remounts
+    // the prompt footer (render-scoped state would reset), and each session
+    // must keep its own draft anyway. Keyed by sessionID.
     const [phase, setPhase] = createSignal<Phase>("idle")
-    let draft = ""
-    const [takes, setTakes] = createSignal(0)
+    const [drafts, setDrafts] = createSignal<Record<string, DraftState>>({})
+    const draftOf = (sessionID: string): DraftState => drafts()[sessionID] ?? EMPTY_DRAFT
+    const putDraft = (sessionID: string, patch: Partial<DraftState>): void => {
+      setDrafts({ ...drafts(), [sessionID]: { ...draftOf(sessionID), ...patch } })
+    }
     // Toggle state: f9 while recording stops the take instead of starting one.
     let stopActive: (() => void) | null = null
 
     interface ActiveEditor {
       getContent: () => string
+      /** Session whose draft this editor edits. */
+      sessionID: string
     }
     let active: ActiveEditor | null = null
 
     const persistActive = (): void => {
       if (!active) return
+      const sessionID = active.sessionID
       const content = active.getContent()
       if (content.trim()) {
-        draft = content
-        log(`persisted editor edits chars=${draft.length}`)
+        putDraft(sessionID, { text: content })
+        log(`persisted editor edits session=${sessionID} chars=${content.length}`)
       } else {
-        draft = ""
-        setTakes(0)
+        putDraft(sessionID, { text: "", takes: 0 })
       }
     }
 
@@ -297,10 +312,11 @@ export default Plugin.define({
         openEditor(sessionID, text, false)
         return
       }
-      draft = draft ? `${draft}\n\n${text}` : text
-      setTakes(takes() + 1)
-      log(`draft take=${takes()} chars=${draft.length}`)
-      openEditor(sessionID, draft, true)
+      const current = draftOf(sessionID)
+      const merged = current.text ? `${current.text}\n\n${text}` : text
+      putDraft(sessionID, { text: merged, takes: current.takes + 1 })
+      log(`draft session=${sessionID} take=${current.takes + 1} chars=${merged.length}`)
+      openEditor(sessionID, merged, true)
     }
 
     const openSendDialog = () => {
@@ -311,40 +327,47 @@ export default Plugin.define({
       }
       // Fold in edits from an editor the host may have closed itself.
       persistActive()
-      // Open the editor even when the draft is empty: it doubles as a
-      // place to compose by hand and then send.
-      openEditor(route.sessionID, draft, true)
+      const sessionID = route.sessionID
+      // Open the editor even when this session's draft is empty: it doubles
+      // as a place to compose by hand and then send.
+      openEditor(sessionID, draftOf(sessionID).text, true)
     }
 
+    // F12 wipes the draft of the session being viewed.
     const clearDraft = async () => {
       const hadEditor = active !== null
-      persistActive()
-      if (!draft.trim()) {
-        if (hadEditor) {
-          active = null
-          ctx.ui.dialog.clear()
-        }
+      const editorSession = active?.sessionID
+      if (active) {
+        persistActive()
+        active = null
+        ctx.ui.dialog.clear()
+      }
+      const route = ctx.ui.router.current()
+      if (route.type !== "session") {
+        ctx.ui.toast.show({ message: "Open a session first.", variant: "warning" })
+        return
+      }
+      const sessionID = route.sessionID
+      const current = draftOf(sessionID)
+      if (!current.text.trim()) {
         ctx.ui.toast.show({ message: "Draft is already empty.", variant: "info" })
         return
       }
       const confirmed = await ctx.ui.dialog.confirm({
         title: "Wipe voice draft?",
-        message: `Discard the draft (${draft.length} chars)? This cannot be undone.`,
+        message: `Discard this session's draft (${current.text.length} chars)? This cannot be undone.`,
         label: { confirm: "Wipe draft", cancel: "Keep it" },
       })
       if (confirmed === true) {
-        active = null
-        draft = ""
-        setTakes(0)
+        putDraft(sessionID, { text: "", takes: 0 })
         ctx.ui.dialog.clear()
         ctx.ui.toast.show({ message: "Voice draft wiped.", variant: "info" })
         return
       }
-      // Kept: if the confirm replaced an open editor, reopen it exactly
-      // as it was (edits were persisted before the confirm appeared).
-      if (hadEditor) {
-        const route = ctx.ui.router.current()
-        if (route.type === "session") openEditor(route.sessionID, draft, true)
+      // Kept: if we closed this session's editor for the confirm, reopen it
+      // exactly as it was (edits were persisted before the confirm appeared).
+      if (hadEditor && editorSession === sessionID) {
+        openEditor(sessionID, draftOf(sessionID).text, true)
       }
     }
 
@@ -371,7 +394,7 @@ export default Plugin.define({
         return edited
       }
 
-      const self: ActiveEditor = { getContent }
+      const self: ActiveEditor = { getContent, sessionID }
       const header = persistDraft
         ? "🎤 Voice draft — edit · Ctrl+Enter send · Esc keep edits"
         : "🎤 Dictation — edit · Ctrl+Enter send · Esc cancel"
@@ -394,7 +417,7 @@ export default Plugin.define({
           return
         }
         sent = true
-        if (persistDraft) draft = text // a failed send must not lose the latest text
+        if (persistDraft) putDraft(sessionID, { text }) // a failed send must not lose the latest text
         try {
           await ctx.client.session.prompt({ sessionID, text })
         } catch (error) {
@@ -410,10 +433,7 @@ export default Plugin.define({
         }
         active = null
         ctx.ui.dialog.clear()
-        if (persistDraft) {
-          draft = ""
-          setTakes(0)
-        }
+        if (persistDraft) putDraft(sessionID, { text: "", takes: 0 })
       }
 
       const cancel = () => {
@@ -452,10 +472,10 @@ export default Plugin.define({
                 if (!cursorPlaced) {
                   cursorPlaced = true
                   setTimeout(() => {
-                    const el = area
-                    if (!el) return
+                    const el2 = area
+                    if (!el2) return
                     try {
-                      el.cursorOffset = displayWidth(initial)
+                      el2.cursorOffset = displayWidth(initial)
                     } catch {
                       // optional nicety, never fatal
                     }
@@ -486,10 +506,11 @@ export default Plugin.define({
     // One footer slot owns the visible parts: the live mic indicator plus
     // the global keymap (layers need a component owner, the slot provides
     // it). All state lives at setup scope above, so slot remounts (session
-    // switches) never lose the draft.
+    // switches) never lose drafts; the take count shown is the visible
+    // session's own.
     return ctx.ui.slot({
       append: "prompt.footer.status",
-      render: () => {
+      render: (input) => {
         ctx.keymap.layer(() => ({
           mode: "global",
           commands: [
@@ -506,7 +527,7 @@ export default Plugin.define({
             {
               id: "voice.send",
               title: "Review voice draft",
-              description: "Open the draft editor (empty or not). Ctrl+Enter sends, Esc keeps.",
+              description: "Open the session's draft editor (empty or not). Ctrl+Enter sends, Esc keeps.",
               group: "Voice",
               bind: "f10",
               palette: true,
@@ -516,7 +537,7 @@ export default Plugin.define({
             {
               id: "voice.clear",
               title: "Wipe voice draft",
-              description: "Discard the accumulated draft (asks for confirmation).",
+              description: "Discard this session's draft (asks for confirmation).",
               group: "Voice",
               bind: "f12",
               palette: true,
@@ -531,7 +552,8 @@ export default Plugin.define({
           const p = phase()
           if (p === "recording") return "🔴 REC f9"
           if (p === "transcribing") return "🟡 …"
-          const n = takes()
+          const sid = input.sessionID
+          const n = sid ? (drafts()[sid]?.takes ?? 0) : 0
           return n > 0 ? `🎤·${n} f9` : "🎤 f9"
         }
         return <text>{label()}</text>

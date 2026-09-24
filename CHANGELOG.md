@@ -2,8 +2,9 @@
 
 ## Unreleased
 
-- Draft is plugin-wide state now: it survives session switches (previously
-  the footer slot remounted on every chat switch and reset it).
+- Drafts are **per session**: each chat keeps its own draft (text + take
+  count); switching chats never mixes or loses them. (Previously the footer
+  slot remounted on every chat switch and reset the single shared draft.)
 - `F10` opens the editor even with an empty draft — it doubles as a place
   to compose by hand, then send.
 - Cursor now starts at the end of the draft (deferred set, display-width

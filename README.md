@@ -44,8 +44,9 @@ lives on `F12`).
   was closed.
 - A failed send keeps the draft and lets you retry; switching sessions
   with the editor open refuses to deliver to the wrong chat.
-- The draft is plugin-wide and survives session switches — dictate in one
-  chat, switch, come back, and your takes are still there.
+- The draft is **per session**: dictate in chat A, switch to B, and each
+  keeps its own takes. Switching back shows A's draft intact, take count
+  and all.
 
 A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡
 transcribing, `🎤·N` = N takes in the draft. Takes cap at 60 s (raise via
