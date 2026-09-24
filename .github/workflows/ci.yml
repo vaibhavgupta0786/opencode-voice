@@ -16,4 +16,5 @@ jobs:
       - run: npm test
       - run: npm run typecheck
       - name: verify recorder binaries are the audited builds
-        run: sha256sum -c bin/SHA256SUMS
+        working-directory: bin
+        run: sha256sum -c SHA256SUMS
