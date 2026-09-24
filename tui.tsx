@@ -196,11 +196,6 @@ export default Plugin.define({
         }
 
         const dictate = async () => {
-          const route = ctx.ui.router.current()
-          if (route.type !== "session") {
-            ctx.ui.toast.show({ message: "Open a session first, then dictate.", variant: "warning" })
-            return
-          }
           // Second f9 while recording: stop the take, transcription follows.
           if (stopActive) {
             ctx.ui.toast.show({ message: "Stopped — transcribing…", variant: "info", duration: 2000 })
@@ -215,7 +210,33 @@ export default Plugin.define({
             ctx.ui.toast.show({ message: "Still transcribing — one moment.", variant: "warning", duration: 2000 })
             return
           }
-          const sessionID = route.sessionID
+          const route = ctx.ui.router.current()
+          let sessionID: string
+          if (route.type === "session") {
+            sessionID = route.sessionID
+          } else if (route.type === "home") {
+            // A brand-new blank session renders the home/launch route.
+            // Dictating there starts the session, exactly like typing a
+            // prompt on the launch view would.
+            try {
+              const created = await ctx.client.session.create({})
+              sessionID = created.id
+              ctx.ui.router.navigate({ type: "session", sessionID })
+              log(`created session ${sessionID} for dictation`)
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error)
+              log(`session create failed: ${message}`)
+              ctx.ui.toast.show({
+                title: "Voice",
+                message: `Could not start a session: ${message}`,
+                variant: "error",
+              })
+              return
+            }
+          } else {
+            ctx.ui.toast.show({ message: "Open a session first, then dictate.", variant: "warning" })
+            return
+          }
           // New take from inside the editor: persist edits, close it, record.
           if (active) {
             persistActive()

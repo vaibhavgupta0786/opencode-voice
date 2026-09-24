@@ -10,7 +10,9 @@ transcript="..."
 
 ## `f9` does nothing at all
 
-- The command needs a session open. Open one first.
+- The command needs a session view. Dictating on the launch/home view of a
+  brand-new session starts that session automatically; other non-session
+  views refuse with a toast.
 - `f9` may be hijacked by macOS (Fn keys). Use `Ctrl+P` → `dictate`,
   or `/dictate`, instead.
 

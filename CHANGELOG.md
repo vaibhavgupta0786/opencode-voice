@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Dictating on a brand-new blank session (home/launch route) now starts the
+  session and dictates into it, like typing a prompt there would — instead
+  of refusing with "open a session first".
+- The stop/transcribing guards now run before the session check, so a
+  second `F9` always stops the take regardless of the current view.
 - Editor rework — one dialog, robust draft lifecycle:
   - Esc (or any host-side close) now **keeps your edits** — they are folded
     back into the draft on every close path, not just our own Esc handler.
