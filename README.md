@@ -26,9 +26,12 @@ git clone https://github.com/vaibhavgupta0786/opencode-voice ~/.config/opencode/
 |---|---|
 | `f9` | dictate a take (press to start, press to stop) — appended to the draft |
 | `f9` again | stop → transcribe → draft editor opens with all takes |
-| `F10` | open the draft editor anytime |
-| `F11` | wipe the draft |
+| `Ctrl+X V` (`<leader>v`) | open the draft editor anytime |
+| `Ctrl+X Shift+V` (`<leader>V`) | wipe the draft |
 | `/dictate`, `/voice-send`, `/voice-clear` | same via slash command / palette |
+
+(Fn keys beyond F9 are macOS-reserved — F10 mutes the mic, F11 shows the
+desktop — so review/wipe live on leader bindings, which always reach the app.)
 
 After each take, the large editor opens with the full draft.
 `Ctrl+Enter` sends everything as one prompt (`Cmd+Enter` also works where the
