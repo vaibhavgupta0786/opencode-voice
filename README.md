@@ -34,6 +34,11 @@ On MacBooks press F-keys **with Fn**. Plain `F10` is the hardware mic-mute
 key and plain `F11` is Show Desktop (macOS reserves it — which is why wipe
 lives on `F12`).
 
+> **Windows**: not yet supported — the bundled recorders target macOS
+> (CoreAudio) and Linux (ALSA/PulseAudio). PRs welcome; the recorder source
+> is [opencode-dictate](https://github.com/rodri45l/opencode-dictate)'s
+> `recorder.c` (miniaudio supports WASAPI).
+
 **Editor semantics** (one dialog, always the whole draft):
 
 - Opens after every take, with the cursor at the end and the view scrolled
@@ -84,6 +89,22 @@ Pure logic in `logic.ts`, host/IO in `tui.ts`. See `CONTRIBUTING.md`.
 `bin/SHA256SUMS` and verified in CI. To rebuild from source, fetch
 `recorder.c` + `miniaudio.h` upstream and compile, e.g. on macOS:
 `cc -O2 -o recorder recorder.c -framework CoreAudio -framework AudioToolbox -framework CoreFoundation`.
+
+## Why this instead of X?
+
+| | This | [renjfk/opencode-voice](https://github.com/renjfk/opencode-voice) | [opencode-dictate](https://github.com/rodri45l/opencode-dictate) |
+|---|---|---|---|
+| Input | `F9` press / `F9` press (toggle) | hold `ctrl+r` | hands-free, open mic |
+| Review before send | always (editable draft) | optional | auto-sends in conversation mode |
+| Draft accumulation | per session | single | n/a (immediate send) |
+| LLM cleanup pass | none needed | required (cloud API) | required for voice commands |
+| TTS voice-out | roadmap | yes (Piper) | no |
+| Answers permissions by voice | never | via LLM | yes (opt-out) |
+| External audio deps | none (bundled recorders) | `sox`, `whisper-cli` | none (bundled) |
+
+**Choose this if** you want push-to-talk with edit-before-send, zero
+surprises (no auto-send, no permission answering), and nothing to install
+beyond a local whisper server.
 
 ## Roadmap
 

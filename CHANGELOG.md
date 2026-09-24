@@ -1,12 +1,8 @@
 # Changelog
 
-## Unreleased
+## v0.2.0
 
-- Switching chats **mid-take discards the take**: the recorder is killed
-  within 500 ms, transcription is skipped entirely (and any in-flight STT
-  result is dropped), and a toast confirms. Only the in-flight take is
-  discarded — no draft is touched. Previously the take kept recording into
-  the old session and its editor opened over the new one.
+- Mid-take session switch discards the take: the recorder is killed within 500 ms, transcription is skipped entirely (and any in-flight STT result is dropped), and a toast confirms. Only the in-flight take is discarded — no draft is touched. Previously the take kept recording into the old session and its editor opened over the new one.
 - Drafts are **per session**: each chat keeps its own draft (text + take
   count); switching chats never mixes or loses them. (Previously the footer
   slot remounted on every chat switch and reset the single shared draft.)
