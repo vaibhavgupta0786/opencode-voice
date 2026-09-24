@@ -47,6 +47,9 @@ lives on `F12`).
 - The draft is **per session**: dictate in chat A, switch to B, and each
   keeps its own takes. Switching back shows A's draft intact, take count
   and all.
+- Switching chats **mid-take discards that take**: the recorder stops
+  within half a second, nothing is transcribed or saved, and a toast says
+  so. The drafts themselves are never touched.
 
 A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡
 transcribing, `🎤·N` = N takes in the draft. Takes cap at 60 s (raise via

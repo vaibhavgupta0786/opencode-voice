@@ -63,10 +63,13 @@ function recorderPath(): string | null {
 }
 
 /** Record one utterance. Audio stays in memory.
- * Returns the capture promise plus a stop handle for toggle mode. */
+ * Returns the capture promise plus a stop handle for toggle mode.
+ * `shouldAbort` is polled every 500 ms: the moment it reports true the
+ * recorder is killed and the take is discarded ("take-aborted"). */
 function capture(
   opts: ReturnType<typeof mergeOptions>,
   log: (m: string) => void,
+  shouldAbort?: () => boolean,
 ): { done: Promise<Capture>; stop: () => void } {
   const cmd = recorderPath()
   if (!cmd)
@@ -136,9 +139,25 @@ function capture(
       }
     })
     child.on("close", () => finish("recorder-exit"))
-    // Failsafe: never hold the mic forever.
+    // Failsafe: never hold the mic forever. Also aborts the take the
+    // moment the user switches away from the session it belongs to
+    // (checked every 500 ms).
     const timer = setInterval(() => {
-      if (!finished && state.elapsed >= opts.maxMs + 5000) finish("watchdog")
+      if (finished) return
+      if (shouldAbort?.()) {
+        finished = true
+        stopFn = () => {}
+        clearInterval(timer)
+        try {
+          child.kill("SIGKILL")
+        } catch {
+          // already exited
+        }
+        log("capture aborted — session switched mid-recording")
+        reject(new Error("take-aborted"))
+        return
+      }
+      if (state.elapsed >= opts.maxMs + 5000) finish("watchdog")
     }, 500)
     stopFn = () => finish("manual-stop")
   })
@@ -265,7 +284,14 @@ export default Plugin.define({
         duration: 2000,
       })
       log("dictate started")
-      const cap = capture(opts, log)
+      // Discard the take if the user switches away from its session: checked
+      // while recording (500 ms ticks), after stop (before STT), and after
+      // STT. Only the take is discarded — every draft stays untouched.
+      const switchedAway = (): boolean => {
+        const r = ctx.ui.router.current()
+        return r.type !== "session" || r.sessionID !== sessionID
+      }
+      const cap = capture(opts, log, switchedAway)
       stopActive = cap.stop
       let audio: Capture
       try {
@@ -274,6 +300,14 @@ export default Plugin.define({
         stopActive = null
         setPhase("idle")
         const message = error instanceof Error ? error.message : String(error)
+        if (message === "take-aborted") {
+          ctx.ui.toast.show({
+            message: "Take discarded — you switched chats mid-recording.",
+            variant: "warning",
+            duration: 3000,
+          })
+          return
+        }
         log(`capture failed: ${message}`)
         ctx.ui.toast.show({ title: "Voice", message: `Mic failed: ${message}`, variant: "error" })
         return
@@ -282,6 +316,14 @@ export default Plugin.define({
       if (!audio.hadSpeech) {
         setPhase("idle")
         ctx.ui.toast.show({ message: "Heard nothing — try again.", variant: "warning" })
+        return
+      }
+      // Checkpoint: switched between stop and transcription — skip the STT
+      // upload entirely.
+      if (switchedAway()) {
+        setPhase("idle")
+        log("discarded take — session switched before transcription")
+        ctx.ui.toast.show({ message: "Take discarded — you switched chats.", variant: "warning", duration: 3000 })
         return
       }
       setPhase("transcribing")
@@ -307,6 +349,14 @@ export default Plugin.define({
       }
       log(`transcript="${text}"`)
       log(`timing audio=${Math.round(audio.voicedMs)}ms stt=${Date.now() - sttStarted}ms bytes=${audio.wav.length}`)
+      // Checkpoint: switched during transcription — the transcript is
+      // discarded, never appended to any draft.
+      if (switchedAway()) {
+        setPhase("idle")
+        log("discarded transcript — session switched during transcription")
+        ctx.ui.toast.show({ message: "Take discarded — you switched chats.", variant: "warning", duration: 3000 })
+        return
+      }
       setPhase("idle")
       if (!opts.accumulate) {
         openEditor(sessionID, text, false)

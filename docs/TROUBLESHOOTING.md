@@ -40,6 +40,13 @@ Toggle mode (default) never ends on silence — only the second `f9` (or the
 either re-enable toggle or raise `silenceMs` (900 → 2500). Very long
 monologues hit the 60 s cap — raise `maxMs` if you want longer takes.
 
+## "Take discarded — you switched chats"
+
+By design: switching sessions mid-take aborts that take (recording stops
+within half a second, nothing is transcribed or saved) so a recording
+started in one chat can never land in another. The drafts themselves are
+untouched — dictate again in the chat you are now viewing.
+
 ## F-keys don't reach the app
 
 Press them **with Fn** on MacBooks. Known macOS hardware/system claims:
