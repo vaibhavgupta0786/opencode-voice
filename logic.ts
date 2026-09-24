@@ -14,6 +14,7 @@ export interface VoiceOptions {
   minSpeechMs?: number // voiced audio required
   vadThreshold?: number // peak amplitude counting as voice
   toggle?: boolean // f9 starts, f9 stops; pauses never end the take
+  accumulate?: boolean // takes pile into a draft; send once via /voice-send
   debug?: boolean
 }
 
@@ -26,6 +27,7 @@ export const DEFAULTS: {
   minSpeechMs: number
   vadThreshold: number
   toggle: boolean
+  accumulate: boolean
   debug: boolean
 } = {
   stt: "http://127.0.0.1:8080/v1",
@@ -36,6 +38,7 @@ export const DEFAULTS: {
   minSpeechMs: 300,
   vadThreshold: 0.03,
   toggle: true,
+  accumulate: true,
   debug: false,
 }
 
@@ -51,6 +54,7 @@ export function mergeOptions(raw: VoiceOptions = {}): RequiredVoiceOptions {
     minSpeechMs: raw.minSpeechMs ?? DEFAULTS.minSpeechMs,
     vadThreshold: raw.vadThreshold ?? DEFAULTS.vadThreshold,
     toggle: raw.toggle ?? DEFAULTS.toggle,
+    accumulate: raw.accumulate ?? DEFAULTS.accumulate,
     debug: raw.debug ?? DEFAULTS.debug,
   }
 }

@@ -156,6 +156,9 @@ export default Plugin.define({
     // TODO: wire debug to plugin options once discovery supports them.
     const opts = { ...mergeOptions(ctx.options as VoiceOptions | undefined), debug: true }
     const log = (m: string) => dbg(opts.debug, m)
+    // Draft: takes pile up here until explicitly sent. Lets you build a
+    // whole context over several takes, then review + send once.
+    // (Lives in the render closure below, next to its display signal.)
     // Toggle state: f9 while recording stops the take instead of starting one.
     let stopActive: (() => void) | null = null
 
@@ -165,6 +168,9 @@ export default Plugin.define({
       append: "prompt.footer.status",
       render: () => {
         const [phase, setPhase] = createSignal<Phase>("idle")
+        let draft = ""
+        const [takes, setTakes] = createSignal(0)
+        let editorOpen = false
 
         const dictate = async () => {
           const route = ctx.ui.router.current()
@@ -232,24 +238,76 @@ export default Plugin.define({
           log(`transcript="${text}"`)
           log(`timing audio=${Math.round(audio.voicedMs)}ms stt=${Date.now() - sttStarted}ms bytes=${audio.wav.length}`)
           setPhase("idle")
-          openEditor(sessionID, text)
+          if (!opts.accumulate) {
+            openEditor(sessionID, text)
+            return
+          }
+          draft = draft ? `${draft}\n\n${text}` : text
+          setTakes(takes() + 1)
+          log(`draft take=${takes()} chars=${draft.length}`)
+          // Single dialog model: every take lands in the draft editor, which
+          // always shows all takes. Reopen if a stale editor is still up.
+          if (editorOpen) ctx.ui.dialog.clear()
+          openEditor(sessionID, draft, () => {
+            draft = ""
+            setTakes(0)
+          })
         }
 
-        // Large editable dialog. Cmd+Enter sends, Esc discards.
-        const openEditor = (sessionID: string, initial: string) => {
+        const openSendDialog = () => {
+          const route = ctx.ui.router.current()
+          if (route.type !== "session") {
+            ctx.ui.toast.show({ message: "Open a session first.", variant: "warning" })
+            return
+          }
+          if (!draft.trim()) {
+            ctx.ui.toast.show({ message: "Draft is empty — dictate with f9 first.", variant: "warning" })
+            return
+          }
+          if (editorOpen) return // already reviewing
+          openEditor(route.sessionID, draft, () => {
+            draft = ""
+            setTakes(0)
+          })
+        }
+
+        const clearDraft = () => {
+          if (editorOpen) {
+            editorOpen = false
+            ctx.ui.dialog.clear()
+          }
+          if (!draft) {
+            ctx.ui.toast.show({ message: "Draft is already empty.", variant: "info" })
+            return
+          }
+          draft = ""
+          setTakes(0)
+          ctx.ui.toast.show({ message: "Voice draft cleared.", variant: "info" })
+        }
+
+        // Large editable dialog. Ctrl+Enter sends, Esc closes keeping the draft.
+        // One flag tracks it so a new take reopens (never stacks) the editor.
+        const openEditor = (sessionID: string, initial: string, afterSend?: () => void) => {
           let edited = initial
           let sent = false
           let area: { plainText: string } | undefined
           const finish = (value: string) => {
             if (sent || !value.trim()) return
             sent = true
+            editorOpen = false
             ctx.ui.dialog.clear()
             void ctx.client.session.prompt({ sessionID, text: value.trim() })
+            afterSend?.()
           }
+          const cancel = () => {
+            editorOpen = false
+            ctx.ui.dialog.clear()
+          }
+          editorOpen = true
           ctx.ui.dialog.set({ size: "large", centered: true })
           ctx.ui.dialog.show(() => (
             <box flexDirection="column" gap={1} padding={1}>
-              <text>🎤 Dictation — edit, Ctrl+Enter to send, Esc to discard</text>
+              <text>🎤 Voice draft — edit, Ctrl+Enter to send, Esc to keep</text>
               <textarea
                 initialValue={initial}
                 focused
@@ -263,7 +321,7 @@ export default Plugin.define({
                 onSubmit={() => finish(area?.plainText ?? edited)}
                 onKeyDown={(event: unknown) => {
                   const name = (event as { name?: string } | null)?.name
-                  if (name === "escape") ctx.ui.dialog.clear()
+                  if (name === "escape") cancel()
                 }}
               />
             </box>
@@ -276,22 +334,43 @@ export default Plugin.define({
             {
               id: "voice.dictate",
               title: "Dictate prompt (voice)",
-              description: "Record one utterance, transcribe locally, edit, then send.",
+              description: "Record one utterance, transcribe locally, add to the draft.",
               group: "Voice",
               bind: "f9",
               palette: true,
               slash: { name: "dictate" },
               run: () => dictate(),
             },
+            {
+              id: "voice.send",
+              title: "Review voice draft",
+              description: "Open the draft editor (all takes). Ctrl+Enter sends, Esc keeps.",
+              group: "Voice",
+              bind: "f10",
+              palette: true,
+              slash: { name: "voice-send" },
+              run: () => openSendDialog(),
+            },
+            {
+              id: "voice.clear",
+              title: "Clear voice draft",
+              description: "Discard the accumulated draft without sending.",
+              group: "Voice",
+              bind: "f11",
+              palette: true,
+              slash: { name: "voice-clear" },
+              run: () => clearDraft(),
+            },
           ],
-          bindings: ["voice.dictate"],
+          bindings: ["voice.dictate", "voice.send", "voice.clear"],
         }))
 
         const label = () => {
           const p = phase()
           if (p === "recording") return "🔴 REC f9"
           if (p === "transcribing") return "🟡 …"
-          return "🎤 f9"
+          const n = takes()
+          return n > 0 ? `🎤·${n} f9` : "🎤 f9"
         }
         return <text>{label()}</text>
       },

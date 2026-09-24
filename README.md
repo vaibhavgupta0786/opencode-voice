@@ -24,13 +24,15 @@ git clone https://github.com/vaibhavgupta0786/opencode-voice ~/.config/opencode/
 
 | Input | Action |
 |---|---|
-| `f9` | start recording ("Recording… f9 to stop.") |
-| `f9` again | stop → transcribe → edit dialog → send |
-| `/dictate` | same, via slash command / palette |
+| `f9` | dictate a take (press to start, press to stop) — appended to the draft |
+| `f9` again | stop → transcribe → draft editor opens with all takes |
+| `F10` | open the draft editor anytime |
+| `F11` | wipe the draft |
+| `/dictate`, `/voice-send`, `/voice-clear` | same via slash command / palette |
 
-After transcribing, a large edit dialog opens with the full text.
-`Ctrl+Enter` sends to the current session (`Cmd+Enter` also works where the
-terminal delivers it), `Esc` discards.
+After each take, the large editor opens with the full draft.
+`Ctrl+Enter` sends everything as one prompt (`Cmd+Enter` also works where the
+terminal delivers it), `Esc` closes keeping the draft.
 A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡 transcribing.
 Takes cap at 60 s. Debug log: `/tmp/opencode/voice-plugin.log`.
 
