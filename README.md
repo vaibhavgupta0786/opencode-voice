@@ -60,6 +60,20 @@ A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡
 transcribing, `🎤·N` = N takes in the draft. Takes cap at 60 s (raise via
 the `maxMs` option). Debug log: `/tmp/opencode/voice-plugin.log`.
 
+## Keeping the STT server alive
+
+Dictation needs the local whisper server on `127.0.0.1:8080`. If it ever
+dies (machine restart, crash), recovery is:
+
+1. **One-time opt-in:** run `/voice-setup` (palette: "Install voice-check
+   recovery skill"). This copies the bundled skill into your global
+   skills directory — nothing is installed silently, ever.
+2. Whenever voice breaks: type `/voice-check` (or just say "voice is
+   dead") and the agent verifies the server, restarts it if needed, and
+   reports back.
+
+Manual recovery is one health check plus a restart — see below.
+
 ## How it works
 
 ```

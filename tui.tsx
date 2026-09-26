@@ -1,7 +1,8 @@
 import { Plugin } from "@opencode/plugin/tui"
 import { createSignal } from "solid-js"
 import { spawn, type ChildProcess } from "node:child_process"
-import { appendFileSync, existsSync, mkdirSync } from "node:fs"
+import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
+import { homedir } from "node:os"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import {
@@ -60,6 +61,34 @@ function recorderPath(): string | null {
   const arch = process.arch === "arm64" ? "arm64" : "x64"
   const path = join(here(), "bin", `${os}-${arch}`, "opencode-voice-recorder")
   return existsSync(path) ? path : null
+}
+
+/** Path of the voice-check skill if installed in the user's global skills
+ * dir (skills are only discovered from there, not from plugin packages). */
+function installedSkillPath(): string {
+  const configHome = process.env.XDG_CONFIG_HOME ?? join(homedir(), ".config")
+  return join(configHome, "opencode", "skills", "voice-check", "SKILL.md")
+}
+
+/** Install the bundled voice-check skill into the user's global skills dir
+ * (once — an existing file is never overwritten, so user edits survive).
+ * Only ever called from the explicit voice-setup command: a plugin package
+ * silently writing to global config on load would be exactly the kind of
+ * behavior a careful developer audits for. */
+function installSkill(log: (m: string) => void): "installed" | "exists" | "missing-source" | "error" {
+  try {
+    const target = installedSkillPath()
+    if (existsSync(target)) return "exists"
+    const source = join(here(), "skills", "voice-check", "SKILL.md")
+    if (!existsSync(source)) return "missing-source"
+    mkdirSync(join(target, ".."), { recursive: true })
+    writeFileSync(target, readFileSync(source))
+    log("installed voice-check skill globally")
+    return "installed"
+  } catch {
+    // a skill install must never break dictation
+    return "error"
+  }
 }
 
 /** Record one utterance. Audio stays in memory.
@@ -337,7 +366,9 @@ export default Plugin.define({
         log(`transcribe failed: ${message}`)
         ctx.ui.toast.show({
           title: "Voice",
-          message: `STT failed (${message}). Is the local server up?`,
+          message: existsSync(installedSkillPath())
+            ? `STT failed (${message}) — run /voice-check to restart the server.`
+            : `STT failed (${message}) — run /voice-setup once, then /voice-check.`,
           variant: "error",
         })
         return
@@ -594,8 +625,35 @@ export default Plugin.define({
               slash: { name: "voice-clear" },
               run: () => clearDraft(),
             },
+            {
+              id: "voice.setup",
+              title: "Install voice-check recovery skill",
+              description: "One-time opt-in: install the voice-check STT recovery skill globally.",
+              group: "Voice",
+              palette: true,
+              slash: { name: "voice-setup" },
+              run: () => {
+                const result = installSkill(log)
+                if (result === "installed") {
+                  ctx.ui.toast.show({
+                    title: "Voice",
+                    message: "voice-check skill installed — type /voice-check or say 'voice is dead' any time.",
+                    variant: "success",
+                    duration: 5000,
+                  })
+                } else if (result === "exists") {
+                  ctx.ui.toast.show({ message: "voice-check skill is already installed.", variant: "info" })
+                } else {
+                  ctx.ui.toast.show({
+                    title: "Voice",
+                    message: "Could not install the skill — see docs/STT.md for manual recovery.",
+                    variant: "error",
+                  })
+                }
+              },
+            },
           ],
-          bindings: ["voice.dictate", "voice.send", "voice.clear"],
+          bindings: ["voice.dictate", "voice.send", "voice.clear", "voice.setup"],
         }))
 
         const label = () => {

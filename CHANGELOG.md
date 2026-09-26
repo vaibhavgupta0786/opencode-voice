@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `voice-check` recovery skill: `/voice-setup` (explicit one-time opt-in)
+  installs it globally; `/voice-check` (or "voice is dead") has the agent
+  verify and restart the local STT server. STT failure toasts point at it.
+  The skill ships inside the package but is never installed silently.
+
 ## v0.2.0
 
 - Mid-take session switch discards the take: the recorder is killed within 500 ms, transcription is skipped entirely (and any in-flight STT result is dropped), and a toast confirms. Only the in-flight take is discarded — no draft is touched. Previously the take kept recording into the old session and its editor opened over the new one.
