@@ -1,6 +1,7 @@
 ---
 name: Voice Check
 description: Check and restart the local whisper STT server that the opencode-voice dictation plugin uses on port 8080. Use when voice dictation fails, an "STT failed" error appears, or the user asks to fix, prepare, check, or bring back voice input.
+slash: true
 ---
 
 # Voice STT server check
