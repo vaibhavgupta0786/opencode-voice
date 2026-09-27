@@ -17,6 +17,12 @@ git clone https://github.com/vaibhavgupta0786/opencode-voice ~/.config/opencode/
 # restart the OpenCode TUI, open a session, press f9
 ```
 
+Or via npm (after `v0.3.0` is published):
+
+```sh
+opencode plugin add @vaibhavgupta0786/opencode-voice
+```
+
 `f9` may be hijacked by macOS Fn keys — `Ctrl+P` → `dictate` (or
 `/dictate`) works the same.
 

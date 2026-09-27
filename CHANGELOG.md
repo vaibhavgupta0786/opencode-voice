@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0
 
 - STT server health dot in the footer: `🟢🎤` / `🔴🎤` for local servers
   (30 s heartbeat + check on load + refresh on every take and after every
