@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- STT server health dot in the footer: `🟢🎤` / `🔴🎤` for local servers
+  (30 s heartbeat + check on load + refresh on every take and after every
+  STT failure, so a green dot can never outlive a failed take). Cloud STT
+  endpoints show no dot — they expose no health route to check.
 - `voice-check` recovery skill: `/voice-setup` (explicit one-time opt-in)
   installs it globally; `@voice-check` (or "voice is dead") has the agent
   verify and restart the local STT server. STT failure toasts point at it.

@@ -141,3 +141,31 @@ export function sttEndpoint(base: string): string {
   const trimmed = base.replace(/\/+$/, "")
   return trimmed.includes("/audio/transcriptions") ? trimmed : `${trimmed}/audio/transcriptions`
 }
+
+/** Health-check candidates, root-first: our mlx server answers /health at
+ * the origin; some OpenAI-compatible servers only answer under the API
+ * base (e.g. /v1/health). Duplicates removed, order kept. */
+export function healthEndpoints(base: string): string[] {
+  const trimmed = base.replace(/\/+$/, "")
+  let origin = trimmed
+  try {
+    origin = new URL(trimmed).origin
+  } catch {
+    // not a parseable URL — probe the base only
+  }
+  const candidates = [`${origin}/health`, `${trimmed}/health`]
+  return [...new Set(candidates)]
+}
+
+/** The health dot is a localhost-server feature: cloud STT endpoints expose
+ * no health route, so a red dot there would always lie. */
+export function isLocalEndpoint(base: string): boolean {
+  try {
+    const raw = new URL(base.replace(/\/+$/, "")).hostname.toLowerCase()
+    // URL keeps IPv6 brackets: "[::1]" -> "::1".
+    const host = raw.startsWith("[") && raw.endsWith("]") ? raw.slice(1, -1) : raw
+    return host === "localhost" || host === "127.0.0.1" || host === "::1"
+  } catch {
+    return false
+  }
+}

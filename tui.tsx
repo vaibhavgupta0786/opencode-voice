@@ -9,7 +9,9 @@ import {
   RATE,
   TICK_MS,
   hadSpeech,
+  healthEndpoints,
   initialVadState,
+  isLocalEndpoint,
   mergeOptions,
   peakOf,
   sttEndpoint,
@@ -33,6 +35,14 @@ import {
 // ---------------------------------------------------------------------------
 
 type Phase = "idle" | "recording" | "transcribing"
+
+/** STT server health. Only tracked for local endpoints — cloud STT has no
+ * health route, so a dot there would always lie (see isLocalEndpoint). */
+type ServerHealth = "unknown" | "up" | "down"
+
+const HEALTH_POLL_MS = 30_000
+const HEALTH_TIMEOUT_MS = 2_000
+const HEALTH_DEBOUNCE_MS = 5_000
 
 const DEBUG_LOG = "/tmp/opencode/voice-plugin.log"
 
@@ -236,6 +246,38 @@ export default Plugin.define({
     const putDraft = (sessionID: string, patch: Partial<DraftState>): void => {
       setDrafts({ ...drafts(), [sessionID]: { ...draftOf(sessionID), ...patch } })
     }
+    // --- server health ------------------------------------------------------
+    // Heartbeat for the local STT server behind the footer mic dot. Read-only
+    // GETs, fire-and-forget, never blocking dictation. Runs on load and every
+    // 30 s; dictate attempts and STT failures force an out-of-band refresh.
+    const localServer = isLocalEndpoint(opts.stt)
+    const [server, setServer] = createSignal<ServerHealth>("unknown")
+    let lastHealthCheck = 0
+    const checkHealth = async (force = false): Promise<void> => {
+      if (!localServer) return
+      if (!force && Date.now() - lastHealthCheck < HEALTH_DEBOUNCE_MS) return
+      lastHealthCheck = Date.now()
+      for (const url of healthEndpoints(opts.stt)) {
+        try {
+          const response = await fetch(url, { signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS) })
+          if (response.ok) {
+            if (server() !== "up") log("stt server up")
+            setServer("up")
+            return
+          }
+        } catch {
+          // try the next candidate
+        }
+      }
+      if (server() !== "down") log("stt server down")
+      setServer("down")
+    }
+
+    let heartbeat: ReturnType<typeof setInterval> | undefined
+    if (localServer) {
+      void checkHealth(true) // no "unknown" dot lingering after load
+      heartbeat = setInterval(() => void checkHealth(), HEALTH_POLL_MS)
+    }
     // Toggle state: f9 while recording stops the take instead of starting one.
     let stopActive: (() => void) | null = null
 
@@ -306,6 +348,8 @@ export default Plugin.define({
         active = null
         ctx.ui.dialog.clear()
       }
+      // Freshest possible dot before recording (debounced: free when recent).
+      await checkHealth()
       setPhase("recording")
       ctx.ui.toast.show({
         message: opts.toggle ? "Recording… f9 to stop." : "Listening… speak now.",
@@ -364,6 +408,9 @@ export default Plugin.define({
         setPhase("idle")
         const message = error instanceof Error ? error.message : String(error)
         log(`transcribe failed: ${message}`)
+        // A green dot must never survive a failed take: force the re-check
+        // so the footer tells the truth within a second.
+        await checkHealth(true)
         ctx.ui.toast.show({
           title: "Voice",
           message: existsSync(installedSkillPath())
@@ -589,7 +636,9 @@ export default Plugin.define({
     // it). All state lives at setup scope above, so slot remounts (session
     // switches) never lose drafts; the take count shown is the visible
     // session's own.
-    return ctx.ui.slot({
+    // The slot's own cleanup plus the heartbeat: composed so a plugin
+    // reload removes the footer/keymap AND stops the timer (no leaks).
+    const releaseSlot = ctx.ui.slot({
       append: "prompt.footer.status",
       render: (input) => {
         ctx.keymap.layer(() => ({
@@ -662,10 +711,22 @@ export default Plugin.define({
           if (p === "transcribing") return "🟡 …"
           const sid = input.sessionID
           const n = sid ? (drafts()[sid]?.takes ?? 0) : 0
-          return n > 0 ? `🎤·${n} f9` : "🎤 f9"
+          const mic = n > 0 ? `🎤·${n} f9` : "🎤 f9"
+          // Health dot only in idle (phases own the footer during a take)
+          // and only for local servers; unknown renders dotless.
+          if (!localServer) return mic
+          const s = server()
+          if (s === "up") return `🟢${mic}`
+          if (s === "down") return `🔴${mic}`
+          return mic
         }
         return <text>{label()}</text>
       },
     })
+
+    return () => {
+      if (heartbeat !== undefined) clearInterval(heartbeat)
+      releaseSlot()
+    }
   },
 })

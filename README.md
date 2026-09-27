@@ -57,8 +57,11 @@ lives on `F12`).
   so. The drafts themselves are never touched.
 
 A mic indicator lives in the prompt footer: 🎤 idle, 🔴 recording, 🟡
-transcribing, `🎤·N` = N takes in the draft. Takes cap at 60 s (raise via
-the `maxMs` option). Debug log: `/tmp/opencode/voice-plugin.log`.
+transcribing, `🎤·N` = N takes in the draft. With a local STT server the
+mic carries a health dot — `🟢🎤` server up, `🔴🎤` server down (checked
+every 30 s, refreshed on every take; cloud STT endpoints show no dot).
+Takes cap at 60 s (raise via the `maxMs` option). Debug log:
+/tmp/opencode/voice-plugin.log.
 
 ## Keeping the STT server alive
 

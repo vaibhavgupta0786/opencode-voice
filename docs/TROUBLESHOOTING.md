@@ -47,6 +47,14 @@ within half a second, nothing is transcribed or saved) so a recording
 started in one chat can never land in another. The drafts themselves are
 untouched — dictate again in the chat you are now viewing.
 
+## Footer mic shows a red dot
+
+The STT server is unreachable: run `@voice-check` (or say "voice is
+dead") to verify and restart it. The dot refreshes every 30 s and on
+every take, so it should flip green on its own once the server is back.
+No dot at all means your `stt` endpoint is not localhost — cloud STT has
+no health route to check, so the mic renders dotless by design.
+
 ## F-keys don't reach the app
 
 Press them **with Fn** on MacBooks. Known macOS hardware/system claims:
