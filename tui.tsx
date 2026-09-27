@@ -367,8 +367,8 @@ export default Plugin.define({
         ctx.ui.toast.show({
           title: "Voice",
           message: existsSync(installedSkillPath())
-            ? `STT failed (${message}) — run /voice-check to restart the server.`
-            : `STT failed (${message}) — run /voice-setup once, then /voice-check.`,
+            ? `STT failed (${message}) — run @voice-check to restart the server.`
+            : `STT failed (${message}) — run /voice-setup once, then @voice-check.`,
           variant: "error",
         })
         return
@@ -637,7 +637,7 @@ export default Plugin.define({
                 if (result === "installed") {
                   ctx.ui.toast.show({
                     title: "Voice",
-                    message: "voice-check skill installed — type /voice-check or say 'voice is dead' any time.",
+                    message: "voice-check skill installed — type @voice-check or say 'voice is dead' any time.",
                     variant: "success",
                     duration: 5000,
                   })

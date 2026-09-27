@@ -3,7 +3,7 @@
 ## Unreleased
 
 - `voice-check` recovery skill: `/voice-setup` (explicit one-time opt-in)
-  installs it globally; `/voice-check` (or "voice is dead") has the agent
+  installs it globally; `@voice-check` (or "voice is dead") has the agent
   verify and restart the local STT server. STT failure toasts point at it.
   The skill ships inside the package but is never installed silently.
 

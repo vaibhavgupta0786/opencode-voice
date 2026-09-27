@@ -26,7 +26,7 @@ If it is down, restart it detached:
     nohup ./mlx-env/bin/python3 mlx_server.py > mlx-server.log 2>&1 &
 
 then re-run the health check every 5 s — the model loads in ~10–25 s on a
-cold start. The `/voice-check` skill automates exactly this.
+cold start. The `@voice-check` skill automates exactly this.
 
 ## mlx-whisper (recommended, Apple Silicon)
 

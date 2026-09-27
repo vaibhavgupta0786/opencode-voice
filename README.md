@@ -68,7 +68,7 @@ dies (machine restart, crash), recovery is:
 1. **One-time opt-in:** run `/voice-setup` (palette: "Install voice-check
    recovery skill"). This copies the bundled skill into your global
    skills directory — nothing is installed silently, ever.
-2. Whenever voice breaks: type `/voice-check` (or just say "voice is
+2. Whenever voice breaks: type `@voice-check` (or just say "voice is
    dead") and the agent verifies the server, restarts it if needed, and
    reports back.
 
