@@ -1,6 +1,6 @@
 {
   "name": "@vaibhavgupta0786/opencode-voice",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Local-only push-to-talk dictation for OpenCode v2 \u2014 press F9, speak, press F9.",
   "type": "module",
   "license": "MIT",
@@ -21,12 +21,10 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@opencode/plugin": "2.0.12"
-  },
-  "peerDependencies": {
-    "@opentui/core": ">=0.5.0",
-    "@opentui/solid": ">=0.5.0",
-    "solid-js": ">=1.9.0"
+    "@opencode/plugin": "2.0.12",
+    "solid-js": "1.9.12",
+    "@opentui/solid": "0.5.12",
+    "@opentui/core": "0.5.12"
   },
   "devDependencies": {
     "@opencode/client": "2.0.12",

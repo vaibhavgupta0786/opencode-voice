@@ -1,4 +1,5 @@
 import { Plugin } from "@opencode/plugin/tui"
+/** @jsxImportSource @opentui/solid */
 import { createSignal } from "solid-js"
 import { spawn, type ChildProcess } from "node:child_process"
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
