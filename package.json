@@ -1,6 +1,6 @@
 {
   "name": "@vaibhavgupta0786/opencode-voice",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "Local-only push-to-talk dictation for OpenCode v2 \u2014 press F9, speak, press F9.",
   "type": "module",
   "license": "MIT",
@@ -32,5 +32,9 @@
     "@types/node": "^22.0.0",
     "solid-js": "^1.9.0",
     "typescript": "^5.4.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vaibhavgupta0786/opencode-voice"
   }
 }
