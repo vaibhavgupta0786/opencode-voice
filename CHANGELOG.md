@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.3.4
+
+- Package metadata only (no code changes): added `keywords` so the plugin is
+  discoverable in npm search, plus `homepage` / `bugs` links.
+
+## v0.3.3
+
+- Added the `repository` field so npm trusted publishing can attest provenance.
+
+## v0.3.1
+
+- `@jsxImportSource @opentui/solid` pragma and real runtime deps
+  (`solid-js`, `@opentui/solid`, `@opentui/core`) so JSX transpiled from the
+  npm cache resolves the Solid runtime instead of `react/jsx-runtime`.
+
 ## v0.3.0
 
 - STT server health dot in the footer: `🟢🎤` / `🔴🎤` for local servers

@@ -1,9 +1,31 @@
 {
   "name": "@vaibhavgupta0786/opencode-voice",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "description": "Local-only push-to-talk dictation for OpenCode v2 \u2014 press F9, speak, press F9.",
   "type": "module",
   "license": "MIT",
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "opencode-tui",
+    "voice",
+    "dictation",
+    "push-to-talk",
+    "speech-to-text",
+    "stt",
+    "whisper",
+    "voice-input",
+    "tui",
+    "plugin",
+    "local",
+    "offline",
+    "mlx",
+    "macos"
+  ],
+  "homepage": "https://github.com/vaibhavgupta0786/opencode-voice#readme",
+  "bugs": {
+    "url": "https://github.com/vaibhavgupta0786/opencode-voice/issues"
+  },
   "exports": {
     "./tui": "./tui.tsx"
   },
