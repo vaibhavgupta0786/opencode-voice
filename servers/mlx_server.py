@@ -22,6 +22,7 @@ from email.policy import default as email_policy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import numpy as np
+import mlx.core as mx
 import mlx_whisper
 
 MODEL = os.environ.get("MLX_MODEL", "mlx-community/whisper-small-mlx")
@@ -79,7 +80,14 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(400, {"error": "no file part"})
                 return
             samples = wav_bytes_to_float32(bytes(audio))
-            result = mlx_whisper.transcribe(samples, path_or_hf_repo=_MODEL_REF)
+            try:
+                result = mlx_whisper.transcribe(samples, path_or_hf_repo=_MODEL_REF)
+            finally:
+                # MLX's Metal buffer cache retains buffers for every unique
+                # tensor shape forever (~40 MB per new audio duration,
+                # measured with vmmap). Clearing it per request keeps the
+                # footprint flat (~0.7 GB) in long-running servers.
+                mx.clear_cache()
             self._json(200, {"text": (result.get("text") or "").strip()})
         except Exception as error:  # keep the endpoint fail-closed with a reason
             self._json(500, {"error": f"{type(error).__name__}: {error}"})
