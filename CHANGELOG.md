@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.3.5
+
+- STT server fix: the bundled mlx server now clears the MLX Metal buffer
+  cache after every transcription request (`mx.clear_cache()` in a
+  `finally`). The cache previously retained buffers for every unique
+  audio-shape (~40 MB each), which ratcheted a 25-day-old server to
+  7.7 GB of GPU memory; the footprint now stays flat at ~0.7 GB.
+
 ## v0.3.4
 
 - Package metadata only (no code changes): added `keywords` so the plugin is
