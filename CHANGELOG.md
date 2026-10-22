@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.3.6
+
+- Fix a v0.3.5 install hazard: `@opencode/plugin` is now capped at
+  `>=2.0.12 <2.0.21`. SDK `2.0.21+` raises its OpenTUI peer floor beyond
+  this plugin's pinned 0.5.12 runtime deps, so unconstrained resolution
+  could fail fresh installs (ERESOLVE). OpenCode resolves the SDK at
+  runtime, so hosts remain unaffected — 2.0.12 / 2.0.28 / 2.1.3 hosts all
+  verified working.
+- README: V2-only note and a **Compatibility** section — OpenCode
+  `2.0.12`, `2.0.28`, and `2.1.3` verified against the published package
+  with real standalone boots (plugin renders, zero plugin errors).
+- Lockfile synced (was stale since 0.3.1); typecheck compiles against
+  the lockfile's `@opencode/plugin` version.
+- Raising the plugin's own `@opentui/*` pins to reach SDK `2.0.21+`
+  (still `0.5.x`, + a full 0.6 migration) is deferred to a follow-up.
+
 ## v0.3.5
 
 - STT server fix: the bundled mlx server now clears the MLX Metal buffer
