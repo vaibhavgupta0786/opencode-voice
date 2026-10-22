@@ -26,6 +26,24 @@ opencode plugin add @vaibhavgupta0786/opencode-voice
 `f9` may be hijacked by macOS Fn keys — `Ctrl+P` → `dictate` (or
 `/dictate`) works the same.
 
+## Compatibility
+
+V2-only — the `Plugin.define` TUI API and slots don't exist in V1.
+
+| OpenCode V2 | Status | Verified |
+|---|---|---|
+| `2.0.12` | ✅ works | footer slot renders, zero errors |
+| `2.0.28` | ✅ works | footer slot renders, zero errors |
+| `2.1.3` | ✅ works | footer slot renders, zero plugin errors |
+
+Verified with each version's real binary booted standalone against the
+published npm package, checking load, slot render, and error logs. The
+plugin only touches two documented-stable APIs —
+`context.ui.slot({ append: "prompt.footer.status" })` and
+`context.keymap.layer()` — no host OpenTUI internals, so the host-side
+OpenTUI 0.5 → 0.6 migration doesn't affect it. Newer `2.x` releases are
+expected to work; if one doesn't, file an issue.
+
 ## Usage
 
 | Input | Action |
