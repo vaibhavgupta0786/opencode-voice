@@ -57,12 +57,27 @@ model loads from cache in roughly 10-25 s on a cold start:
 
     curl -s -m 3 http://127.0.0.1:8080/health
 
-## 5. If it still will not start
+## 5. Memory check
+
+Long-running STT servers ratchet memory silently — buffer allocators
+retain everything (measured: the mlx server held 7.7 GB after 25 days
+because each unique audio length adds GPU buffers that are never freed;
+a per-request `mx.clear_cache()` now caps it). Verify after boot:
+
+    PID=$(lsof -ti:8080 | head -1)
+    vmmap --summary $PID 2>/dev/null | grep "Physical footprint"
+
+Healthy: mlx server ≈ 0.7–1.5 GB · CPU (faster-whisper) ≈ 0.4–0.9 GB.
+If the footprint is already high (mlx > 2 GB, CPU > 1 GB), return to
+step 3, restart, and re-verify after one real take — the plateau is the
+health signal, not the size.
+
+## 6. If it still will not start
 
 Show the last 10-20 lines of the server log (`mlx-server.log` or
 `stt-server.log`) and report the error you see. Do not guess further.
 
-## 6. Report
+## 7. Report
 
-One line: server was up / has been restarted / failed (with the error).
-Remind the user to press Fn+F9 to dictate.
+One line: server was up / has been restarted / failed (with the error),
+plus the footprint reading. Remind the user to press Fn+F9 to dictate.
