@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.3.7
+
+- Dependency campaign: `@opentui/{core,solid}` `0.5.12` → `0.5.17`
+  (same 0.5 line), which unlocks `@opencode/plugin` resolution up to
+  `2.0.32` (range now `>= 2.0.12 < 2.1.0`); `SDK 2.1.x` still awaits the
+  OpenTUI 0.6 migration. `@types/node` to `^26`.
+- `solid-js` deliberately pinned at `1.9.12`: `@opentui/solid@0.5.17`
+  peers it exactly — the "next" bump is unresolvable (dependabot #4
+  documented and closed for this reason).
+- Dependabot config: grouped weekly prod/dev updates; peer-locked
+  `@opentui/*` and `@opencode/*` wheels excluded and bumped by hand.
+- Verified: clean `npm install`, 16/16 tests, `tsc --noEmit` clean on
+  the new tree.
+
 ## v0.3.6
 
 - Fix a v0.3.5 install hazard: `@opencode/plugin` is now capped at
