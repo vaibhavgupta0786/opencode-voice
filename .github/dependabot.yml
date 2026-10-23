@@ -4,7 +4,22 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    groups:
+      prod-deps:
+        dependency-type: production
+      dev-deps:
+        dependency-type: development
+    ignore:
+      # @opentui/solid pins solid-js exactly; single-version bumps of the
+      # @opentui pair must move together (tracked by hand, see README).
+      - dependency-name: "@opentui/*"
+      # the @opencode SDK peers pin exact sibling versions per release
+      - dependency-name: "@opencode/*"
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
+    groups:
+      actions:
+        patterns:
+          - "*"
