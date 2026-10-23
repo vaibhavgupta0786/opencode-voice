@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.3.8
+
+- STT server: no-speech gate for the mlx server. Pure noise/silence no
+  longer transcribes into hallucination (`{"text": ""}` instead);
+  voiced-frame minimum (default 200 ms) + zero-crossing-rate cap
+  (`VOICE_NOSPEECH_MIN_MS` / `VOICE_NOSPEECH_ZCR`, "0" disables each).
+- `voice-check` skill: new **Memory check** step — vmmap-footprint gate
+  with healthy plateaus (mlx 0.7–1.5 GB / CPU 0.4–0.9 GB) so memory
+  ratchets are caught before they reach GB scale.
+
 ## v0.3.7
 
 - Dependency campaign: `@opentui/{core,solid}` `0.5.12` → `0.5.17`
